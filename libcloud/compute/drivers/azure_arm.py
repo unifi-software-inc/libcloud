@@ -21,6 +21,7 @@ http://azure.microsoft.com/en-us/services/virtual-machines/
 
 import base64
 import binascii
+import json
 import os
 import time
 
@@ -1394,6 +1395,170 @@ class AzureNodeDriver(NodeDriver):
                                           net["location"],
                                           net["properties"])
                 for net in r.object["value"]]
+
+    def ex_create_resource_group(self, name, location=None):
+        """
+        Create resource group
+
+        :param name: Name of the resource group to create
+        :type name: ``str``
+
+        :param location: The location at which to create the resource
+        group (if None, use default location specified as 'region' in __init__)
+        :type location: :class:`.NodeLocation`
+
+        """
+
+        if location is None or self.default_location:
+            location = self.default_location
+        else:
+            raise ValueError("location is required ")
+
+        target = "/subscriptions/%s/resourceGroups/%s" \
+                 % (self.subscription_id, name)
+        data = {
+            "location": location.id,
+        }
+        r = self.connection.request(target,
+                                    params={"api-version": "2015-01-01"},
+                                    data=data,
+                                    method='PUT')
+        return r.object
+
+    def ex_create_virtual_network(self, name, resource_group,
+                                  addressprefix, subnet,
+                                  subnet_addressprefix, location=None):
+        """
+        Create virtual network
+
+        :param name: Name of the virtual network to create
+        :type name: ``str``
+
+        :param resource_group: The resource group to create the
+         virtual network in
+        :type resource_group: ``str``
+
+        :param addressprefix: collection of address prefixes that make up
+         the virtual network
+        :type addressprefix: ``str``
+
+        :param subnet: name of the subnet for the virtual network
+        :type subnet: ``str``
+
+        :param subnet_addressprefix: collection of subnet address prefixes
+         that make up the virtual network
+        :type subnet_addressprefix: ``str``
+
+        :param location: The location at which to create the virtual
+         network (if None, use default location specified as 'region'
+         in __init__)
+        :type location: :class:`.NodeLocation`
+
+        """
+
+        if location is None or self.default_location:
+            location = self.default_location
+        else:
+            raise ValueError("location is required ")
+
+        target = "/subscriptions/%s/resourceGroups/%s/" \
+                 "providers/Microsoft.Network/virtualNetworks/%s" \
+                 % (self.subscription_id, resource_group, name)
+
+        data = {
+          "location": location.id,
+          "properties": {
+            "addressSpace": {
+                "addressPrefixes": [
+                    addressprefix
+                ]
+             },
+            "subnets": [
+                {
+                    "properties": {
+                        "provisioningState": "Succeeded",
+                        "addressPrefix": subnet_addressprefix
+                    }
+                }
+             ]
+           }
+        }
+        for s in data['properties']['subnets']:
+            s['name'] = subnet
+
+        r = self.connection.request(target,
+                                    params={"api-version": "2016-09-01"},
+                                    data=data,
+                                    method='PUT')
+        return r.object
+
+    def ex_create_storage_account(self, name, resource_group,
+                                  template_file, location=None):
+        """
+        Create storage account
+
+        :param name: Name of the storage account to create
+        :type name: ``str``
+
+        :param resource_group: The resource group to create the
+         storage account in
+        :type resource_group: ``str``
+
+        :param template_file: The storage template file with
+         storage account properties
+        :type template_file: ``file``
+
+        :param location: The location at which to create the storage account.
+         (if None, use default location specified as 'region' in __init__)
+        :type location: :class:`.NodeLocation`
+
+        """
+
+        target = "/subscriptions/%s/resourceGroups/%s/" \
+                 "providers/Microsoft.Storage/storageAccounts/%s" \
+                 % (self.subscription_id, resource_group, name)
+
+        with open(template_file) as fp:
+            data = json.load(fp)
+
+        r = self.connection.request(target,
+                                    params={"api-version": "2016-12-01"},
+                                    data=data,
+                                    method='PUT')
+        return r.object
+
+    def ex_create_hdi_cluster(self, name, resource_group, hdi_template_file,
+                              location=None):
+        """
+        Create HDI cluster
+
+        :param name: Name of the HDI cluster to create
+        :type name: ``str``
+
+        :param resource_group: The resource group to create the
+         HDI cluster in
+        :type resource_group: ``str``
+
+        :param template_file: The HDI cluster template file
+        :type template_file: ``file``
+
+        :param location: The location at which to create the HDI cluster.
+         (if None, use default location specified as 'region' in __init__)
+        :type location: :class:`.NodeLocation`
+
+        """
+        target = "/subscriptions/%s/resourceGroups/%s/" \
+                 "providers/Microsoft.HDInsight/clusters/%s" \
+                 % (self.subscription_id, resource_group, name)
+
+        with open(hdi_template_file) as fp:
+            data = json.load(fp)
+
+        r = self.connection.request(target,
+                                    params={"api-version": "2015-03-01-preview"},
+                                    data=data,
+                                    method='PUT')
+        return r.object
 
     def ex_create_network_security_group(self, name, resource_group,
                                          location=None):
